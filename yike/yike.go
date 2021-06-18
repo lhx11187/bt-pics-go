@@ -14,7 +14,7 @@ import (
 const (
 	// 按 4MB 分割文件上传
 	splitSize = 4 * 1024 * 1024
-	// 取前 256 KB  字节结算 MD5
+	// 取前 256 KB  字节计算 MD5
 	md5Size = 256 * 1024
 )
 
@@ -61,6 +61,13 @@ func New(data []byte, remotePath string) *YkFile {
 	// 文件将被分成的段数
 	blockNum := int(math.Ceil(float64(len(data)) / float64(splitSize)))
 
+	// 当文件大小小于 md5Size 时，两个 MD5 相同
+	var contentMd5 = md5.Sum(data)
+	var sliceMd5 = contentMd5
+	if len(data) > md5Size {
+		sliceMd5 = md5.Sum(data[:md5Size])
+	}
+
 	// 文件对象，将返回
 	ykFile := YkFile{
 		Origin:       data,
@@ -69,8 +76,8 @@ func New(data []byte, remotePath string) *YkFile {
 		Isdir:        "0",
 		Path:         remotePath,
 		Size:         strconv.Itoa(len(data)),
-		ContentMd5:   fmt.Sprintf("%x", md5.Sum(data)),
-		SliceMd5:     fmt.Sprintf("%x", md5.Sum(data[:md5Size])),
+		ContentMd5:   fmt.Sprintf("%x", contentMd5),
+		SliceMd5:     fmt.Sprintf("%x", sliceMd5),
 	}
 
 	// 将文件分段
@@ -125,7 +132,7 @@ func (yk *YkFile) precreate() (*PreResp, error) {
 	form := url.Values{}
 	form.Add("autoinit", "1")
 	form.Add("isdir", yk.Isdir)
-	form.Add("rtype", "3")
+	form.Add("rtype", "2")
 	form.Add("ctype", "11")
 	form.Add("path", yk.Path)
 
@@ -135,7 +142,7 @@ func (yk *YkFile) precreate() (*PreResp, error) {
 	form.Add("block_list", yk.BlockMD5Str)
 	// form.Add("local_ctime", fmt.Sprintf("%d", time.Now().Unix()))
 	// form.Add("local_mtime", fmt.Sprintf("%d", time.Now().Unix()))
-	
+
 	// 发送表单
 	bs, err := client.Client.PostForm(precreateURL, form.Encode(), headers)
 	if err != nil {
@@ -187,7 +194,7 @@ func (yk *YkFile) create(uploadid string) error {
 	// 创建表单
 	form := url.Values{}
 	form.Add("isdir", yk.Isdir)
-	form.Add("rtype", "3")
+	form.Add("rtype", "2")
 	form.Add("ctype", "11")
 	form.Add("path", yk.Path)
 
