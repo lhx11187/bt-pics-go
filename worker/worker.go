@@ -28,6 +28,13 @@ var (
 
 // InitWorker 初始化工作协程
 func InitWorker(workerCount int) (chan comm.Task, *sync.WaitGroup) {
+	// 当程序崩溃时保存进度
+	defer func() {
+		if err := recover(); err != nil {
+			conf.SaveWBIDStr()
+		}
+	}()
+
 	// 设置处理器
 	// 是否需要设置 TG 推送信息
 	if conf.Conf.Processor == comm.PassToTG {

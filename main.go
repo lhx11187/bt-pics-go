@@ -28,7 +28,7 @@ func main() {
 		os.Exit(0)
 	}()
 
-	// 保存进度
+	// 当程序崩溃时保存进度
 	defer func() {
 		if err := recover(); err != nil {
 			conf.SaveWBIDStr()

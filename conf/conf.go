@@ -71,7 +71,7 @@ func init() {
 		fmt.Printf("创建配置文件：%s\n", confPath)
 		bs, err := json.MarshalIndent(Conf, "", "  ")
 		fatal(err)
-		_, err = dofile.Write(bs, confPath, os.O_CREATE, 0644)
+		_, err = dofile.Write(bs, confPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 		fatal(err)
 	}
 }
@@ -80,7 +80,7 @@ func init() {
 func Save() {
 	bs, err := json.MarshalIndent(Conf, "", "  ")
 	fatal(err)
-	_, err = dofile.Write(bs, confPath, os.O_CREATE, 0644)
+	_, err = dofile.Write(bs, confPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	fatal(err)
 }
 
