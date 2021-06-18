@@ -1,0 +1,6 @@
+.idea/
+go.sum
+*.exe
+*.log
+*.json
+bt-pics-go
