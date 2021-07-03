@@ -1,0 +1,17 @@
+{
+  "worker_count": 0,
+  "handler": "",
+  "local_root": "",
+  "proxy": "",
+  "pic_targets": null,
+  "yike": {
+    "bdstoken": "",
+    "cookie": ""
+  },
+  "tg": {
+    "no_token": "",
+    "no_chat_id": "",
+    "pic_save_token": "",
+    "pic_save_chat_id": ""
+  }
+}

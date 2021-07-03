@@ -2,13 +2,17 @@ package yike
 
 import (
 	"bt-pics-go/client"
+	"bt-pics-go/comm"
 	"bt-pics-go/conf"
+	"bt-pics-go/logger"
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"math"
 	"net/url"
-	"strconv"
+	"path/filepath"
+	"strings"
+	"time"
 )
 
 const (
@@ -20,15 +24,18 @@ const (
 
 // YkFile 一刻相册的文件类型
 type YkFile struct {
-	Origin       []byte   // 原始数据
-	BlockList    [][]byte // 每 4MB 分块
+	Origin       []byte   // 文件的二进制数据
+	BlockList    [][]byte // 按每 4MB 分块文件，得到的二进制数据
 	BlockMD5List []string // 每个分块的 MD5
 	BlockMD5Str  string   // 每个分块的 MD5 数组被转为字符串
 	Path         string   // 文件被保存到的远程目录，如"/filename.jpg"
-	Isdir        string
-	Size         string
+	Isdir        int
+	Size         int
 	SliceMd5     string
 	ContentMd5   string
+
+	// 可选
+	LocalCtime int64 // 创建时间
 }
 
 var (
@@ -39,6 +46,11 @@ var (
 		"&channel=chunlei&clienttype=70&web=1&logid=MTYyNDAwODkyNzY1NTAuNzEyMjQyOTExODk0OTE1" +
 		"&path=%s&uploadid=%s&partseq=%d"
 	createURL = "https://photo.baidu.com/youai/file/v1/create?clienttype=70&bdstoken=%s"
+	// 列出文件
+	listURL = "https://photo.baidu.com/youai/file/v1/list?clienttype=70&" +
+		"bdstoken=%s&need_thumbnail=1&need_filter_hidden=0"
+	// 删除文件
+	delURL = "https://photo.baidu.com/youai/file/v1/delete?clienttype=70&bdstoken=%s&fsid_list=%s"
 	// 请求头
 	headers map[string]string
 )
@@ -46,6 +58,7 @@ var (
 func init() {
 	precreateURL = fmt.Sprintf(precreateURL, conf.Conf.Yike.Bdstoken)
 	createURL = fmt.Sprintf(createURL, conf.Conf.Yike.Bdstoken)
+	listURL = fmt.Sprintf(listURL, conf.Conf.Yike.Bdstoken)
 
 	headers = map[string]string{
 		"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) " +
@@ -56,8 +69,85 @@ func init() {
 	}
 }
 
+// SendmAlbum 发送图集
+func SendmAlbum(album comm.Album) error {
+	for _, u := range album.URLs {
+		// 先下载文件
+		bs, err := client.Client.Get(u, album.Header)
+		if err != nil {
+			return fmt.Errorf("下载文件'%s'出错：%s\n", u, err)
+		}
+
+		// 发送到一刻相册
+		filename := filepath.Base(u)
+		if i := strings.Index(filename, "?"); i >= 0 {
+			filename = filename[:i]
+		}
+		yk := New(bs, fmt.Sprintf("/%s/%s", album.ID, filename), album.Created)
+		yk.Origin = nil
+		yk.BlockList = nil
+		err = yk.UploadFile()
+		if err != nil {
+			return fmt.Errorf("发送文件(%d KB)到一刻相册时出错：%s\n", len(bs)/1024, err)
+		}
+	}
+	return nil
+}
+
+// DelAll 删除所有文件
+func DelAll() error {
+	for {
+		// 列出文件
+		bs, err := client.Client.Get(listURL, headers)
+		if err != nil {
+			return fmt.Errorf("列出文件出错：%w", err)
+		}
+		var files FilesResp
+		err = json.Unmarshal(bs, &files)
+		if err != nil {
+			return fmt.Errorf("解析文件列表出错：%w", err)
+		}
+		if files.Errno != 0 {
+			return fmt.Errorf("列出文件失败：%s\n", string(bs))
+		}
+
+		// 删除文件
+		fidList := make([]int64, len(files.List))
+		for i, f := range files.List {
+			fidList[i] = f.Fsid
+		}
+		bs, err = json.Marshal(fidList)
+		if err != nil {
+			return fmt.Errorf("序列化文件的 ID 列表时出错：%w", err)
+		}
+		u := fmt.Sprintf(delURL, conf.Conf.Yike.Bdstoken, string(bs))
+		bs, err = client.Client.Get(u, headers)
+		if err != nil {
+			return fmt.Errorf("删除文件出错：%w", err)
+		}
+		var resp PreResp
+		err = json.Unmarshal(bs, &resp)
+		if err != nil {
+			return fmt.Errorf("解析删除文件的响应时出错：%w", err)
+		}
+		if resp.Errno == 2 {
+			break
+		}
+		if resp.Errno != 0 {
+			logger.Error.Printf("删除文件失败：%s\n", string(bs))
+			// return fmt.Errorf("删除文件失败：%s\n", string(bs))
+		}
+
+		logger.Info.Printf("已删除此页，将继续删除下页\n")
+		time.Sleep(1 * time.Second)
+	}
+	logger.Info.Printf("已尝试删除所有文件，若还有遗漏，可再次运行本程序\n")
+	return nil
+}
+
 // New 创建一刻文件的实例
-func New(data []byte, remotePath string) *YkFile {
+// createdTime 为 0 时，将自动设为 Unix 时间戳（秒）
+func New(data []byte, remotePath string, createdTime int64) *YkFile {
 	// 文件将被分成的段数
 	blockNum := int(math.Ceil(float64(len(data)) / float64(splitSize)))
 
@@ -73,13 +163,18 @@ func New(data []byte, remotePath string) *YkFile {
 		Origin:       data,
 		BlockList:    make([][]byte, blockNum),
 		BlockMD5List: make([]string, blockNum),
-		Isdir:        "0",
+		Isdir:        0,
 		Path:         remotePath,
-		Size:         strconv.Itoa(len(data)),
+		Size:         len(data),
 		ContentMd5:   fmt.Sprintf("%x", contentMd5),
 		SliceMd5:     fmt.Sprintf("%x", sliceMd5),
 	}
-
+	// 其它属性
+	sec := createdTime
+	if sec == 0 {
+		sec = time.Now().Unix()
+	}
+	ykFile.LocalCtime = sec
 	// 将文件分段
 	i := 0
 	for pos := 0; i < blockNum; pos += splitSize {
@@ -129,18 +224,19 @@ func (yk *YkFile) UploadFile() error {
 // 预处理数据文件
 func (yk *YkFile) precreate() (*PreResp, error) {
 	// 创建表单
+	// "rtype"的值需要为"3"（覆盖文件）
 	form := url.Values{}
 	form.Add("autoinit", "1")
-	form.Add("isdir", yk.Isdir)
-	form.Add("rtype", "2")
+	form.Add("isdir", fmt.Sprintf("%d", yk.Isdir))
+	form.Add("rtype", "3")
 	form.Add("ctype", "11")
 	form.Add("path", yk.Path)
 
 	form.Add("content-md5", yk.ContentMd5)
-	form.Add("size", yk.Size)
+	form.Add("size", fmt.Sprintf("%d", yk.Size))
 	form.Add("slice-md5", yk.SliceMd5)
 	form.Add("block_list", yk.BlockMD5Str)
-	// form.Add("local_ctime", fmt.Sprintf("%d", time.Now().Unix()))
+	form.Add("local_ctime", fmt.Sprintf("%d", yk.LocalCtime))
 	// form.Add("local_mtime", fmt.Sprintf("%d", time.Now().Unix()))
 
 	// 发送表单
@@ -193,13 +289,13 @@ func (yk *YkFile) superfile(resp *PreResp) error {
 func (yk *YkFile) create(uploadid string) error {
 	// 创建表单
 	form := url.Values{}
-	form.Add("isdir", yk.Isdir)
-	form.Add("rtype", "2")
+	form.Add("isdir", fmt.Sprintf("%d", yk.Isdir))
+	form.Add("rtype", "3")
 	form.Add("ctype", "11")
 	form.Add("path", yk.Path)
 
 	form.Add("content-md5", yk.ContentMd5)
-	form.Add("size", yk.Size)
+	form.Add("size", fmt.Sprintf("%d", yk.Size))
 	form.Add("uploadid", uploadid)
 	form.Add("block_list", yk.BlockMD5Str)
 

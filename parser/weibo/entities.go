@@ -7,6 +7,7 @@ type PostPage struct {
 			Idstr   string   `json:"idstr"`
 			PicIds  []string `json:"pic_ids"`
 			TextRaw string   `json:"text_raw"`
+			Created int64    `json:"created_at"`
 		} `json:"list"`
 	} `json:"data"`
 }

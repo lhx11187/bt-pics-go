@@ -9,7 +9,16 @@ type PreResp struct {
 
 // UpResp 上传分段的响应
 type UpResp struct {
-	Md5       string `json:"md5"`
-	Partseq   string `json:"partseq"`
-	Uploadid  string `json:"uploadid"`
+	Md5      string `json:"md5"`
+	Partseq  string `json:"partseq"`
+	Uploadid string `json:"uploadid"`
+}
+
+// FilesResp 文件列表
+type FilesResp struct {
+	Cursor string `json:"cursor"`
+	Errno  int    `json:"errno"`
+	List   []struct {
+		Fsid int64 `json:"fsid"`
+	} `json:"list"`
 }
