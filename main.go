@@ -57,10 +57,10 @@ func main() {
 
 	// 等待任务完成
 	// 注意：当整个过程都没有任务时，程序会 在 worker 一直等待任务，而发生阻塞，需要手动停止程序
-	logger.Info.Println("[main] 正在等待任务完成…")
+	logger.Info.Println("[Main] 正在执行任务…")
 	worker.WG.Wait()
 
 	// 已完成所有任务，准备结束程序
 	logger.SaveWhenExit()
-	client.Notify("[BT_PICS] 已完成发送任务")
+	client.Notify("[BT_PICS] 已完成下载、发送任务")
 }

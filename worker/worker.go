@@ -28,7 +28,7 @@ func InitWorker(workerCount int) {
 	for id := 1; id <= workerCount; id++ {
 		go worker(id)
 	}
-	logger.Info.Println("[worker] 工作 goroutine 已准备就绪")
+	logger.Info.Println("[Worker] 工作协程已准备就绪")
 }
 
 // 工作
@@ -37,7 +37,7 @@ func worker(id int) {
 	// 当程序崩溃时保存进度
 	defer func() {
 		if err := recover(); err != nil {
-			logger.Error.Printf("程序崩溃，将保存记录后退出：%s\n", err)
+			logger.Error.Printf("[Worker] 程序崩溃，将保存记录后退出：%s\n", err)
 			logger.SaveWhenExit()
 			os.Exit(0)
 		}
@@ -65,7 +65,7 @@ func worker(id int) {
 		case conf.HandlerToTG:
 			err = totg.Send(task)
 		default:
-			logger.Warn.Printf("未知的 Handler：%s\n", conf.Conf.Handler)
+			logger.Warn.Printf("[Worker] 未知的 Handler：'%s'\n", conf.Conf.Handler)
 			os.Exit(0)
 		}
 		if err != nil {
@@ -87,7 +87,7 @@ func worker(id int) {
 			logger.LogRmFail(task)
 		}
 
-		logger.Info.Printf("[Worker%d][%s]已完成发送专辑列表'%s'\n", id, task.Tag, task.ID)
+		logger.Info.Printf("[Worker%d][%s] 已完成下载、发送专辑'%s'\n", id, task.Tag, task.ID)
 	}
 
 	// 显示我们完成了工作

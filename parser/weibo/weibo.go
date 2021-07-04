@@ -41,7 +41,7 @@ func DownloadAll(target *conf.Target) {
 	// 失败的任务不需要先排序，因为全部需要下载，不需要判断结束
 	retryTasks := logger.GetFailLog()
 	// 计数
-	logger.Info.Printf("[%s] 重试下载 %d 个图集\n", target.Plat, len(retryTasks))
+	logger.Info.Printf("[%s][%s] 重试下载 %d 个图集\n", target.Plat, target.ID, len(retryTasks))
 	for _, task := range retryTasks {
 		// 重试时设置标志为重试，以在下载成功后删除失败记录中该图集的记录
 		task.IsRetry = true
@@ -50,7 +50,7 @@ func DownloadAll(target *conf.Target) {
 		worker.TasksCh <- task
 	}
 
-	logger.Info.Printf("[%s] 已重发上次失败的图集，将开始继续下载新图集\n", target.Plat)
+	logger.Info.Printf("[%s][%s] 已重发上次失败的图集，将开始继续下载新图集\n", target.Plat, target.ID)
 
 	// 该用户的所有图集
 	var allAlbum = make(map[string]comm.Album)
@@ -62,9 +62,9 @@ func DownloadAll(target *conf.Target) {
 	logger.Fatal(err)
 	if exists {
 		allAlbum = unMarshalPosts(postsName)
-		logger.Info.Printf("[%s]已从文件读取用户'%s'的所有图集\n", comm.TagWeibo, target.ID)
+		logger.Info.Printf("[%s][%s] 已从文件读取该用户的图集数据\n", comm.TagWeibo, target.ID)
 	} else {
-		logger.Info.Printf("[%s]没有用户'%s'的图集数据的文件\n", comm.TagWeibo, target.ID)
+		logger.Info.Printf("[%s][%s] 没有该用户的图集数据的文件\n", comm.TagWeibo, target.ID)
 		return
 		/*
 			allAlbum = getAllAlbum(target.ID, idDone, &headers)
@@ -96,21 +96,24 @@ func DownloadAll(target *conf.Target) {
 	// 继续任务
 	taskIdstrList := idstrList[lastIndex+1:]
 	// 计数
-	logger.Info.Printf("[%s] 新添加下载 %d 个图集\n", target.Plat, len(taskIdstrList))
+	logger.Info.Printf("[%s][%s] 新添加下载 %d 个图集\n", target.Plat, target.ID, len(taskIdstrList))
 
 	for _, idstr := range taskIdstrList {
 		// 因为 ID 按从小到大的增序排序，跳过已保存过的 ID
 		if idDone != "" && strings.Compare(idstr, idDone) <= 0 {
 			continue
 		}
-
+		// 跳过没有图集链接的任务
+		if len(allAlbum[idstr].URLs) == 0 || len(allAlbum[idstr].URLsM) == 0 {
+			continue
+		}
 		// logger.Info.Printf("准备发送图集'%s'\n", idstr)
 		worker.TasksCh <- comm.Album{Tag: comm.TagWeibo, ID: idstr, Created: allAlbum[idstr].Created,
 			URLs: allAlbum[idstr].URLs, URLsM: allAlbum[idstr].URLsM, IDDonePtr: &target.IDDone, Header: headers}
 	}
 
 	// 任务完成
-	logger.Info.Printf("[%s]已提交所有任务\n", comm.TagWeibo)
+	logger.Info.Printf("[%s][%s] 已提交所有任务\n", target.Plat, target.ID)
 }
 
 // 从文件解析图集信息
@@ -175,7 +178,7 @@ func getAllAlbum(uid string, idDone string, headers *map[string]string) map[stri
 			// 添加到所有图集中，以返回
 			posts[post.Idstr] = task
 		}
-		logger.Info.Printf("[微博] 已添加第 %d 页的图集\n", page)
+		logger.Info.Printf("[%s][%s] 已添加第 %d 页的图集\n", page)
 		page++
 
 		// 等待不固定的时间，以防被禁止访问
