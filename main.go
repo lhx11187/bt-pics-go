@@ -7,7 +7,6 @@ import (
 	"bt-pics-go/logger"
 	"bt-pics-go/parser/weibo"
 	"bt-pics-go/worker"
-	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -45,7 +44,7 @@ func main() {
 	worker.InitWorker(workerCount)
 	worker.WG.Add(workerCount)
 
-	// 执行任务
+	// 发送任务，需要顺序发送，以方便发送完成后关闭任务通道
 	for i, target := range conf.Conf.PicTargets {
 		switch target.Plat {
 		case comm.TagWeibo:
@@ -53,12 +52,15 @@ func main() {
 		}
 	}
 
+	// 关闭任务通道
+	close(worker.TasksCh)
+
 	// 等待任务完成
 	// 注意：当整个过程都没有任务时，程序会 在 worker 一直等待任务，而发生阻塞，需要手动停止程序
-	logger.Info.Println("正在等待任务完成…")
+	logger.Info.Println("[main] 正在等待任务完成…")
 	worker.WG.Wait()
 
 	// 已完成所有任务，准备结束程序
 	logger.SaveWhenExit()
-	client.Notify(fmt.Sprintf("[BT_PICS] [%s] 已完成任务", comm.TagWeibo))
+	client.Notify("[BT_PICS] 已完成发送任务")
 }

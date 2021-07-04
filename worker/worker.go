@@ -17,13 +17,6 @@ var (
 	// TasksCh 任务通道
 	TasksCh chan comm.Album
 	WG      sync.WaitGroup
-
-	// Total 总任务的数量
-	Total   = 0
-	MuTotal = sync.Mutex{}
-	// 已处理任务的数量
-	count = 0
-	mu    sync.Mutex
 )
 
 // InitWorker 初始化工作协程
@@ -35,7 +28,7 @@ func InitWorker(workerCount int) {
 	for id := 1; id <= workerCount; id++ {
 		go worker(id)
 	}
-	logger.Info.Println("工作 goroutine 已准备就绪")
+	logger.Info.Println("[worker] 工作 goroutine 已准备就绪")
 }
 
 // 工作
@@ -61,16 +54,6 @@ func worker(id int) {
 
 		// 显示我们开始工作了
 		// fmt.Printf("Worker: %d : Started %s\n", id, task)
-
-		// 计数
-		mu.Lock()
-		count++
-		MuTotal.Lock()
-		if count == Total {
-			close(TasksCh)
-		}
-		MuTotal.Unlock()
-		mu.Unlock()
 
 		var err error
 		switch conf.Conf.Handler {
@@ -109,12 +92,4 @@ func worker(id int) {
 
 	// 显示我们完成了工作
 	// fmt.Printf("Worker: %d : Completed %s\n", id, task)
-}
-
-// AddTotal 添加总任务数
-func AddTotal(num int) {
-	MuTotal.Lock()
-	Total += num
-	logger.Info.Printf("新增加 %d 个任务，总共 %d 个任务\n", num, Total)
-	MuTotal.Unlock()
 }

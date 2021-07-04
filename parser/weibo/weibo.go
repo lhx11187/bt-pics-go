@@ -17,6 +17,7 @@ import (
 )
 
 const (
+	// API
 	mymblogAPI  = "https://weibo.com/ajax/statuses/mymblog?uid=%s&page=%d&feature=1"
 	downloadAPI = "https://weibo.com/ajax/common/download?pid=%s"
 )
@@ -40,7 +41,7 @@ func DownloadAll(target *conf.Target) {
 	// 失败的任务不需要先排序，因为全部需要下载，不需要判断结束
 	retryTasks := logger.GetFailLog()
 	// 计数
-	worker.AddTotal(len(retryTasks))
+	logger.Info.Printf("[%s] 重试下载 %d 个图集\n", target.Plat, len(retryTasks))
 	for _, task := range retryTasks {
 		// 重试时设置标志为重试，以在下载成功后删除失败记录中该图集的记录
 		task.IsRetry = true
@@ -49,7 +50,7 @@ func DownloadAll(target *conf.Target) {
 		worker.TasksCh <- task
 	}
 
-	logger.Info.Printf("已重发上次失败的图集，将开始继续下载新图集\n")
+	logger.Info.Printf("[%s] 已重发上次失败的图集，将开始继续下载新图集\n", target.Plat)
 
 	// 该用户的所有图集
 	var allAlbum = make(map[string]comm.Album)
@@ -95,7 +96,8 @@ func DownloadAll(target *conf.Target) {
 	// 继续任务
 	taskIdstrList := idstrList[lastIndex+1:]
 	// 计数
-	worker.AddTotal(len(taskIdstrList))
+	logger.Info.Printf("[%s] 新添加下载 %d 个图集\n", target.Plat, len(taskIdstrList))
+
 	for _, idstr := range taskIdstrList {
 		// 因为 ID 按从小到大的增序排序，跳过已保存过的 ID
 		if idDone != "" && strings.Compare(idstr, idDone) <= 0 {
@@ -111,14 +113,6 @@ func DownloadAll(target *conf.Target) {
 	logger.Info.Printf("[%s]已提交所有任务\n", comm.TagWeibo)
 }
 
-// 保存图集信息到文件
-func marshalPosts(posts map[string]comm.Album, path string) {
-	bs, err := json.MarshalIndent(posts, "", "  ")
-	logger.Fatal(err)
-	_, err = dofile.Write(bs, path, dofile.OTrunc, 0644)
-	logger.Fatal(err)
-}
-
 // 从文件解析图集信息
 func unMarshalPosts(path string) map[string]comm.Album {
 	bs, err := dofile.Read(path)
@@ -127,6 +121,14 @@ func unMarshalPosts(path string) map[string]comm.Album {
 	err = json.Unmarshal(bs, &posts)
 	logger.Fatal(err)
 	return posts
+}
+
+// 保存图集信息到文件
+func marshalPosts(posts map[string]comm.Album, path string) {
+	bs, err := json.MarshalIndent(posts, "", "  ")
+	logger.Fatal(err)
+	_, err = dofile.Write(bs, path, dofile.OTrunc, 0644)
+	logger.Fatal(err)
 }
 
 // 获取微博指定用户所有帖子的图集
