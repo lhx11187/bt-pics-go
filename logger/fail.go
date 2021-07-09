@@ -19,13 +19,13 @@ var (
 func init() {
 	// 读取出错记录
 	exists, err := dofile.Exists(failLogName)
-	Fatal(err)
+	Fatal("判断失败日志文件存在时出错", err)
 	if exists {
 		bs, err := dofile.Read(failLogName)
-		Fatal(err)
+		Fatal("读取失败日志文件时出错", err)
 
 		err = json.Unmarshal(bs, &failLog)
-		Fatal(err)
+		Fatal("解析失败日志文件时出错", err)
 	}
 }
 
@@ -54,14 +54,10 @@ func LogRmFail(album comm.Album) {
 // logFailToFile 保存失败记录到文件
 func logFailToFile() {
 	mu.Lock()
-	if len(failLog) == 0 {
-		mu.Unlock()
-		return
-	}
 	bs, err := json.MarshalIndent(failLog, "", "  ")
 	mu.Unlock()
 
-	Fatal(err)
+	Fatal("文本化失败日志时出错", err)
 	_, err = dofile.Write(bs, failLogName, dofile.OTrunc, 0644)
-	Fatal(err)
+	Fatal("保存失败日志到文件时出错", err)
 }

@@ -29,5 +29,5 @@ func Notify(msg string) {
 		return
 	}
 	_, err := tg.SendMessage(noChatIDTG, msg)
-	logger.Fatal(err)
+	logger.Fatal("发送通知消息时出错", err)
 }

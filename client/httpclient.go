@@ -15,10 +15,11 @@ var (
 
 func init() {
 	// 如果配置中指定了代理，需要设置
-	if conf.Conf.Proxy != "" {
-		err := Client.SetProxy(conf.Conf.Proxy)
+	proxy := conf.Conf.Proxy
+	if proxy != "" {
+		err := Client.SetProxy(proxy)
 		if err != nil {
-			logger.Fatal(err)
+			logger.Fatal("设置HTTP代理时出错", err)
 		}
 	}
 }

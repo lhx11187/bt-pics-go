@@ -2,6 +2,7 @@ package logger
 
 import (
 	"bt-pics-go/conf"
+	"fmt"
 	"github.com/donething/utils-go/dolog"
 	"log"
 )
@@ -27,8 +28,8 @@ func SaveWhenExit() {
 	logFailToFile()
 }
 
-func Fatal(err error) {
+func Fatal(msg string, err error) {
 	if err != nil {
-		panic(err)
+		panic(fmt.Errorf("%s：%w", msg, err))
 	}
 }

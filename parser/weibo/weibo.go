@@ -46,7 +46,8 @@ func DownloadAll(target *conf.Target) {
 		// 重试时设置标志为重试，以在下载成功后删除失败记录中该图集的记录
 		task.IsRetry = true
 		task.Header = headers
-		logger.Info.Printf("准备重试下载图集'%s'\n", task.ID)
+		task.IDDonePtr = &target.IDDone
+		logger.Info.Printf("[%s][%s] 重试下载图集'%s'\n", target.Plat, target.ID, task.ID)
 		worker.TasksCh <- task
 	}
 
@@ -59,7 +60,7 @@ func DownloadAll(target *conf.Target) {
 	// 本地文件命名为："平台名_ID.json"，如"weibo_6032474791.json"
 	postsName = fmt.Sprintf("%s_%s.json", comm.TagWeibo, target.ID)
 	exists, err := dofile.Exists(postsName)
-	logger.Fatal(err)
+	logger.Fatal("判断图集数据的文件是否存在时出错", err)
 	if exists {
 		allAlbum = unMarshalPosts(postsName)
 		logger.Info.Printf("[%s][%s] 已从文件读取该用户的图集数据\n", comm.TagWeibo, target.ID)
@@ -119,19 +120,19 @@ func DownloadAll(target *conf.Target) {
 // 从文件解析图集信息
 func unMarshalPosts(path string) map[string]comm.Album {
 	bs, err := dofile.Read(path)
-	logger.Fatal(err)
+	logger.Fatal("读取图集数据的文件时出错", err)
 	var posts map[string]comm.Album
 	err = json.Unmarshal(bs, &posts)
-	logger.Fatal(err)
+	logger.Fatal("解析图集数据时出错", err)
 	return posts
 }
 
 // 保存图集信息到文件
 func marshalPosts(posts map[string]comm.Album, path string) {
 	bs, err := json.MarshalIndent(posts, "", "  ")
-	logger.Fatal(err)
+	logger.Fatal("文本化图集数据时出错", err)
 	_, err = dofile.Write(bs, path, dofile.OTrunc, 0644)
-	logger.Fatal(err)
+	logger.Fatal("将图集数据保存到文件时出错", err)
 }
 
 // 获取微博指定用户所有帖子的图集
@@ -145,9 +146,9 @@ func getAllAlbum(uid string, idDone string, headers *map[string]string) map[stri
 	for {
 		// 读取 API，解析
 		bs, err := client.Client.Get(fmt.Sprintf(mymblogAPI, uid, page), *headers)
-		logger.Fatal(err)
+		logger.Fatal("联网获取图集数据时出错", err)
 		err = json.Unmarshal(bs, &postPage)
-		logger.Fatal(err)
+		logger.Fatal("解析获取到底图集数据时出错", err)
 
 		// 返回内容的帖子数量为 0 时，表示遍历完成，退出循环
 		if len(postPage.Data.List) == 0 {
