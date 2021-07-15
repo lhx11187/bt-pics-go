@@ -7,7 +7,6 @@ import (
 	"bt-pics-go/handlers/totg"
 	"bt-pics-go/logger"
 	"bt-pics-go/yike"
-	"fmt"
 	"os"
 	"strings"
 	"sync"
@@ -48,7 +47,7 @@ func worker(id int) {
 		task, ok := <-TasksCh
 		if !ok {
 			// 这意味着通道已经空了，并且已被关闭
-			fmt.Printf("Worker%d: 通道已关闭，完成任务\n", id)
+			logger.Info.Printf("[Worker%d] 通道已关闭，完成任务\n", id)
 			return
 		}
 
@@ -65,7 +64,7 @@ func worker(id int) {
 		case conf.HandlerToTG:
 			err = totg.Send(task)
 		default:
-			logger.Warn.Printf("[Worker] 未知的 Handler：'%s'\n", conf.Conf.Handler)
+			logger.Warn.Printf("[Worker%d] 未知的 Handler：'%s'\n", id, conf.Conf.Handler)
 			os.Exit(0)
 		}
 		if err != nil {
