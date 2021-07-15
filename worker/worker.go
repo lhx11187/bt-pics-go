@@ -36,7 +36,7 @@ func worker(id int) {
 	// 当程序崩溃时保存进度
 	defer func() {
 		if err := recover(); err != nil {
-			logger.Error.Printf("[Worker] 程序崩溃，将保存记录后退出：%s\n", err)
+			logger.Error.Printf("[Worker%d] 程序崩溃，将保存记录后退出：%s\n", id, err)
 			logger.SaveWhenExit()
 			os.Exit(0)
 		}
